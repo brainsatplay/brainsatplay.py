@@ -1,6 +1,8 @@
 # brainsatplay.py
 A Python library for interfacing with Brains@Play
 
+> Warning: Not well tested...
+
 * [Installation](#Installation)
 * [Support](#Support)
 
