@@ -1,27 +1,105 @@
-import sys
-import os
-from brainsatplay import Brainstorm 
-import numpy as np
-import asyncio
+import brainsatplay 
 import time
 import math
+from brainflow.board_shim import BoardShim, BrainFlowInputParams, LogLevels, BoardIds
+from brainflow.data_filter import DataFilter, FilterTypes
+import sys, signal
 
-# async def beginStream(BOARD, PORT, URL, LOGIN_DATA, GAME, ACCESS, CONSENT, DATA_STREAM, ARBITRARY_EVENT_FUNCTION):
+def main():
 
-#     # Initialize the Trace
-#     brain = Brain()
+    '''
+    Connect to the Brainstorm
+    '''   
+    # Authentication
+    username = 'guest'
+    password = ''
 
-#     # Connect Websocket and (if applicable) start streaming a Brainflow-compatible EEG device
-#     await brain.stream(url=URL,login_data=LOGIN_DATA,game=GAME,access=ACCESS, consent=CONSENT, data_stream=DATA_STREAM, arbitraryEventFunction=ARBITRARY_EVENT_FUNCTION, board=BOARD, port=PORT)
+    ## Set Connection Details
+    # brainstorm = brainsatplay.Brainstorm('https://localhost') # Local
+    brainstorm = brainsatplay.Brainstorm() # Deployed Server
 
-async def main():
+    ## Connect
+    res = brainstorm.connect(username,password) # All optional (defaults to guest)
 
-    brainstorm = Brainstorm('http://localhost','8000')
-    connection = asyncio.create_task(brainstorm.connect())
-    await connection
+    '''
+    Subscribe to a Particular Game
+    '''   
+    # # Connection Settings
+    # appname = 'brainstorm'
+    # devices = []
+    # props = ['raw','times','sps','deviceType','format','eegChannelTags']
+    # sessionid = None
+    # spectating = False # Spectate to view data without sending it
 
-    # brain = asyncio.create_task(beginStream(BOARD, PORT, URL, LOGIN_DATA, GAME, ACCESS, CONSENT, DATA_STREAM,arbitraryEventFunction))
-    # await brain
+    # res = brainstorm.getSessions(appname)
+    
+    # if res['msg'] != 'appNotFound':
+    #     sessionid = res['sessions'][0]['id']
+    # else:
+    #     res = brainstorm.createSession(appname, devices, props)
+    #     sessionid = res['sessionInfo']['id']
+
+    # # Handle Data from Subscribed Games
+    #     def newData(json):
+    #         for user in json['userData']:
+    #             name = user['username']
+    #             print('Data for {}'.format(name))
+    # res = brainstorm.subscribeToSession(sessionid,spectating, newData)
+        
+
+    '''
+    Stream your Data
+    '''
+
+    # Setup Brainflow
+    params = BrainFlowInputParams()
+    board_id = BoardIds['SYNTHETIC_BOARD'].value
+    board = BoardShim(board_id, params)
+    board.rate = BoardShim.get_sampling_rate(board_id)
+    board.channels = BoardShim.get_eeg_channels(board_id)
+    board.time_channel = BoardShim.get_timestamp_channel(board_id)
+    board.eeg_channels = BoardShim.get_eeg_channels(board_id)
+    board.eeg_names = BoardShim.get_eeg_names(board_id)
+    board.prepare_session()
+    board.start_stream(num_samples=450000)
+
+    # Handle CTRL-C Exit
+    def onStop():
+        board.stop_stream()
+        board.release_session()
+
+    loopCount = 0
+
+    # Start Stream Loop
+    def streamLoop():
+        pass_data = []
+        rate = DataFilter.get_nearest_power_of_two(board.rate)
+        data = board.get_board_data()
+        t = data[board.time_channel]
+
+        data = data[board.eeg_channels] 
+
+        for entry in data:
+            pass_data.append((entry).tolist())
+            
+        data = {}
+        data['raw'] = pass_data
+        data['times'] = t.tolist()
+
+        # Send Metadata on First Loop
+        if loopCount == 0:
+            data['sps'] = board.rate
+            data['deviceType'] = 'eeg'
+            data['format'] = 'brainflow'
+            tags = []
+            for i, channel in enumerate(board.eeg_channels):
+                tags.append({'ch': channel-1, 'tag': board.eeg_names[i], 'analyze':True})
+
+            data['eegChannelTags'] = tags
+        
+        return data
+
+    res = brainstorm.startStream(streamLoop, onStop)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

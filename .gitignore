@@ -1,0 +1,6 @@
+.eggs
+
+/build
+/dist
+/brainsatplay.egg-info
+/__pycache__
