@@ -42,7 +42,7 @@ class Brainstorm():
         self.password = password
 
         def encodeForSubprotocol(field, value):
-            return field + '&' + value.replace(' ', '')
+            return f'{field}&' + value.replace(' ', '')
 
         subprotocols = [encodeForSubprotocol('username', self.username),encodeForSubprotocol('password', self.password), encodeForSubprotocol('origin', 'brainsatplay.py')]
 
@@ -171,11 +171,8 @@ class Brainstorm():
                 self.stop()
                 print("\n\nClient disconnected.\n\n")
                 return
-            
-            if (checkForResponse):
-                return await self.__waitForResponse()
-            else:
-                return 'left'
+
+            return await self.__waitForResponse() if checkForResponse else 'left'
         else:
             print('\n\nno websocket connection\n\n')
 

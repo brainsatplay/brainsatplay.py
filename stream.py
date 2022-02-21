@@ -72,18 +72,14 @@ def main():
 
     # Start Stream Loop
     def streamLoop():
-        pass_data = []
         rate = DataFilter.get_nearest_power_of_two(board.rate)
         data = board.get_board_data()
         t = data[board.time_channel]
 
         data = data[board.eeg_channels] 
 
-        for entry in data:
-            pass_data.append((entry).tolist())
-            
-        data = {}
-        data['raw'] = pass_data
+        pass_data = [(entry).tolist() for entry in data]
+        data = {'raw': pass_data}
         data['times'] = t.tolist()
 
         # Send Metadata on First Loop
@@ -91,12 +87,13 @@ def main():
             data['sps'] = board.rate
             data['deviceType'] = 'eeg'
             data['format'] = 'brainflow'
-            tags = []
-            for i, channel in enumerate(board.eeg_channels):
-                tags.append({'ch': channel-1, 'tag': board.eeg_names[i], 'analyze':True})
+            tags = [
+                {'ch': channel - 1, 'tag': board.eeg_names[i], 'analyze': True}
+                for i, channel in enumerate(board.eeg_channels)
+            ]
 
             data['eegChannelTags'] = tags
-        
+
         return data
 
     res = brainstorm.startStream(streamLoop, onStop)
